@@ -60,7 +60,7 @@ cd <your-repo>
 ```powershell
 # From the repo root
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+venv\Scripts\activate
 
 # Upgrade pip (recommended)
 python -m pip install --upgrade pip
