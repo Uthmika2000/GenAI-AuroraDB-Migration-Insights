@@ -9,9 +9,6 @@ A quick, practical guide to get your environment ready and run the scripts.
 - **SQL Server Management Studio (SSMS)** – already set up
 - **Python 3.8+** (with pip)
 - **VS Code** with GitHub Copilot + Copilot Chat
-- **AWS CLI** (for Aurora/DMS interaction)
-- **Java 8+** (for Babelfish Compass)
-- **Node.js** (optional, for additional tooling)
 
 ### OS Packages (Linux)
 
@@ -97,27 +94,6 @@ pip install -r requirements.txt
 2. Edit `.env` and add your configuration details:
 
 > **Important:** Keep `.env` out of version control. A `.gitignore` entry is usually already provided.
-
-## Java & Babelfish Compass (if applicable)
-
-Ensure Java 8+ is installed:
-```bash
-java -version
-```
-
-Follow your Babelfish Compass instructions or run the provided script in `tools/` if present.
-
-## Node.js (optional)
-
-Some helper tools or UI dashboards may require Node:
-```bash
-node -v
-npm -v
-
-# If needed:
-# nvm install --lts
-# nvm use --lts
-```
 
 ## Running the Scripts
 
