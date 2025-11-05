@@ -98,21 +98,6 @@ pip install -r requirements.txt
 
 > **Important:** Keep `.env` out of version control. A `.gitignore` entry is usually already provided.
 
-## AWS CLI Setup (for Aurora/DMS)
-
-```bash
-aws --version
-aws configure
-# Provide AWS Access Key ID, Secret Access Key, default region (e.g., us-east-1), and output format (json)
-```
-
-**Quick checks:**
-```bash
-aws sts get-caller-identity
-aws rds describe-db-clusters --region us-east-1
-aws dms describe-replication-instances --region us-east-1
-```
-
 ## Java & Babelfish Compass (if applicable)
 
 Ensure Java 8+ is installed:
@@ -177,7 +162,6 @@ Make sure your IAM user/role has access to RDS, DMS, and (if used) Bedrock.
 1. Install prerequisites (Python 3.8+, VS Code + Copilot, AWS CLI, Java, Node optional)
 2. Clone repo → create and activate venv → `pip install -r requirements.txt`
 3. `cp .env.example .env` → fill your config
-4. `aws configure` and verify access
-5. Run scripts with `python scripts/<name>.py` (outputs go to `outputs/`)
+4. Run scripts with `python scripts/<name>.py` (outputs go to `outputs/`)
 
 ---
