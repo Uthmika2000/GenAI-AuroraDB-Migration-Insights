@@ -10,18 +10,6 @@ A quick, practical guide to get your environment ready and run the scripts.
 - **Python 3.8+** (with pip)
 - **VS Code** with GitHub Copilot + Copilot Chat
 
-### OS Packages (Linux)
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install -y python3 python3-venv python3-pip git unzip
-```
-
-**RHEL/CentOS/Rocky:**
-```bash
-sudo dnf install -y python3 python3-pip python3-virtualenv git unzip
-```
-
 ## VS Code Setup
 
 ### Install GitHub Copilot
