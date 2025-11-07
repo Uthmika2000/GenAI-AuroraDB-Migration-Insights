@@ -9,21 +9,6 @@ A quick, practical guide to get your environment ready and run the scripts.
 - **SQL Server Management Studio (SSMS)** – already set up
 - **Python 3.8+** (with pip)
 - **VS Code** with GitHub Copilot + Copilot Chat
-- **AWS CLI** (for Aurora/DMS interaction)
-- **Java 8+** (for Babelfish Compass)
-- **Node.js** (optional, for additional tooling)
-
-### OS Packages (Linux)
-
-**Ubuntu/Debian:**
-```bash
-sudo apt update && sudo apt install -y python3 python3-venv python3-pip git unzip
-```
-
-**RHEL/CentOS/Rocky:**
-```bash
-sudo dnf install -y python3 python3-pip python3-virtualenv git unzip
-```
 
 ## VS Code Setup
 
@@ -63,7 +48,7 @@ cd <your-repo>
 ```powershell
 # From the repo root
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+venv\Scripts\activate
 
 # Upgrade pip (recommended)
 python -m pip install --upgrade pip
@@ -97,42 +82,6 @@ pip install -r requirements.txt
 2. Edit `.env` and add your configuration details:
 
 > **Important:** Keep `.env` out of version control. A `.gitignore` entry is usually already provided.
-
-## AWS CLI Setup (for Aurora/DMS)
-
-```bash
-aws --version
-aws configure
-# Provide AWS Access Key ID, Secret Access Key, default region (e.g., us-east-1), and output format (json)
-```
-
-**Quick checks:**
-```bash
-aws sts get-caller-identity
-aws rds describe-db-clusters --region us-east-1
-aws dms describe-replication-instances --region us-east-1
-```
-
-## Java & Babelfish Compass (if applicable)
-
-Ensure Java 8+ is installed:
-```bash
-java -version
-```
-
-Follow your Babelfish Compass instructions or run the provided script in `tools/` if present.
-
-## Node.js (optional)
-
-Some helper tools or UI dashboards may require Node:
-```bash
-node -v
-npm -v
-
-# If needed:
-# nvm install --lts
-# nvm use --lts
-```
 
 ## Running the Scripts
 
@@ -177,7 +126,6 @@ Make sure your IAM user/role has access to RDS, DMS, and (if used) Bedrock.
 1. Install prerequisites (Python 3.8+, VS Code + Copilot, AWS CLI, Java, Node optional)
 2. Clone repo → create and activate venv → `pip install -r requirements.txt`
 3. `cp .env.example .env` → fill your config
-4. `aws configure` and verify access
-5. Run scripts with `python scripts/<name>.py` (outputs go to `outputs/`)
+4. Run scripts with `python scripts/<name>.py` (outputs go to `outputs/`)
 
 ---
