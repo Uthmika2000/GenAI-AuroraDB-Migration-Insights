@@ -1,6 +1,6 @@
 """
-Use Case 1: Automated Data Collection & Normalization
-Captures comprehensive database metadata, performance metrics, and configuration
+Use Case 1: Automated Data Collection & Normalization (Enhanced)
+Captures comprehensive database metadata, performance metrics, configuration, and fragmentation
 """
 import pyodbc
 import json
@@ -15,19 +15,18 @@ class DatabaseInventory:
         self.conn = pyodbc.connect(connection_string)
         self.cursor = self.conn.cursor()
         
-        # Create outputs folder if it doesn't exist
         if not os.path.exists('outputs'):
             os.makedirs('outputs')
-            print("✓ Created 'outputs' folder")
+            print(" Created 'outputs' folder")
         
     def collect_database_metadata(self):
-        """Collect all database schemas, sizes, and configuration"""
+        # Collect all database schemas, sizes, and configuration
         metadata = {
             'timestamp': datetime.now().isoformat(),
             'databases': []
         }
         
-        # Get all databases (exclude system DBs)
+        # Get all databases
         self.cursor.execute("""
             SELECT 
                 name, 
@@ -59,14 +58,15 @@ class DatabaseInventory:
                 'tables': self.get_table_info(dbname),
                 'indexes': self.get_index_info(dbname),
                 'stored_procedures': self.get_stored_procedure_info(dbname),
-                'constraints': self.get_constraint_info(dbname)
+                'constraints': self.get_constraint_info(dbname),
+                'fragmentation': self.get_fragmentation_info(dbname)
             }
             metadata['databases'].append(db_info)
             
         return metadata
     
     def get_schemas(self, database_name):
-        """Get all schemas in database"""
+        # Get all schemas in database
         try:
             self.cursor.execute(f"""
                 SELECT name 
@@ -79,7 +79,6 @@ class DatabaseInventory:
             return []
     
     def get_database_size(self, database_name):
-        """Get database size information"""
         try:
             self.cursor.execute(f"""
                 SELECT 
@@ -100,7 +99,6 @@ class DatabaseInventory:
             return {'total_mb': 0.0, 'data_mb': 0.0, 'log_mb': 0.0}
     
     def get_table_info(self, database_name):
-        """Get detailed table information - FIXED: Changed RowCount to TableRowCount"""
         try:
             self.cursor.execute(f"""
                 SELECT 
@@ -134,7 +132,6 @@ class DatabaseInventory:
             return []
 
     def get_index_info(self, database_name):
-        # Get index information
         try:
             self.cursor.execute(f"""
                 SELECT 
@@ -176,7 +173,6 @@ class DatabaseInventory:
             return []
     
     def get_stored_procedure_info(self, database_name):
-        # Get stored procedure information
         try:
             self.cursor.execute(f"""
                 SELECT 
@@ -202,7 +198,6 @@ class DatabaseInventory:
             return []
     
     def get_constraint_info(self, database_name):
-        # Get constraint information
         try:
             self.cursor.execute(f"""
                 SELECT 
@@ -239,8 +234,121 @@ class DatabaseInventory:
             print(f"  Warning: Could not get constraint info for {database_name}: {e}")
             return []
     
+    def get_fragmentation_info(self, database_name):
+        try:
+            self.cursor.execute(f"""
+                SELECT 
+                    OBJECT_SCHEMA_NAME(ips.object_id, DB_ID('{database_name}')) AS SchemaName,
+                    OBJECT_NAME(ips.object_id, DB_ID('{database_name}')) AS TableName,
+                    i.name AS IndexName,
+                    i.type_desc AS IndexType,
+                    ips.index_id,
+                    ips.avg_fragmentation_in_percent,
+                    ips.fragment_count,
+                    ips.page_count,
+                    ips.avg_page_space_used_in_percent,
+                    ips.record_count
+                FROM sys.dm_db_index_physical_stats(
+                    DB_ID('{database_name}'), 
+                    NULL, 
+                    NULL, 
+                    NULL, 
+                    'LIMITED'
+                ) AS ips
+                INNER JOIN [{database_name}].sys.indexes AS i 
+                    ON ips.object_id = i.object_id 
+                    AND ips.index_id = i.index_id
+                WHERE ips.index_id > 0  -- Exclude heaps
+                    AND OBJECT_NAME(ips.object_id, DB_ID('{database_name}')) IS NOT NULL
+                ORDER BY ips.avg_fragmentation_in_percent DESC
+            """)
+            
+            fragmentation_data = []
+            high_frag_count = 0
+            moderate_frag_count = 0
+            
+            for row in self.cursor.fetchall():
+                frag_pct = row.avg_fragmentation_in_percent
+                
+                # Categorize fragmentation level
+                if frag_pct > 30:
+                    frag_level = 'HIGH'
+                    high_frag_count += 1
+                elif frag_pct > 10:
+                    frag_level = 'MODERATE'
+                    moderate_frag_count += 1
+                else:
+                    frag_level = 'LOW'
+                
+                # Determine recommendation
+                if frag_pct > 30:
+                    recommendation = 'REBUILD index recommended'
+                elif frag_pct > 10:
+                    recommendation = 'REORGANIZE index recommended'
+                else:
+                    recommendation = 'No action needed'
+                
+                fragmentation_data.append({
+                    'schema': row.SchemaName,
+                    'table': row.TableName,
+                    'index_name': row.IndexName,
+                    'index_type': row.IndexType,
+                    'fragmentation_percent': round(frag_pct, 2),
+                    'fragmentation_level': frag_level,
+                    'fragment_count': row.fragment_count,
+                    'page_count': row.page_count,
+                    'avg_page_space_used_percent': round(row.avg_page_space_used_in_percent, 2),
+                    'record_count': row.record_count,
+                    'recommendation': recommendation
+                })
+            
+            return {
+                'summary': {
+                    'total_indexes': len(fragmentation_data),
+                    'high_fragmentation': high_frag_count,
+                    'moderate_fragmentation': moderate_frag_count,
+                    'low_fragmentation': len(fragmentation_data) - high_frag_count - moderate_frag_count
+                },
+                'details': fragmentation_data
+            }
+            
+        except Exception as e:
+            print(f"  Warning: Could not get fragmentation info for {database_name}: {e}")
+            return {'error': str(e)}
+    
+    def get_server_configurations(self):
+        try:
+            self.cursor.execute("""
+                SELECT 
+                    name,
+                    CAST(value AS INT) as value,
+                    CAST(value_in_use AS INT) as value_in_use,
+                    description
+                FROM sys.configurations
+                ORDER BY name
+            """)
+            
+            configs = []
+            for row in self.cursor.fetchall():
+                configs.append({
+                    'name': row.name,
+                    'value': row.value,
+                    'value_in_use': row.value_in_use,
+                    'description': row.description,
+                    'requires_restart': row.value != row.value_in_use
+                })
+            
+            return {
+                'count': len(configs),
+                'configurations': configs,
+                'pending_restart': any(c['requires_restart'] for c in configs)
+            }
+            
+        except Exception as e:
+            print(f"  Warning: Could not get server configurations: {e}")
+            return {'error': str(e)}
+    
     def collect_performance_metrics(self):
-        # Collect performance baseline metrics
         metrics = {}
         
         try:
@@ -334,6 +442,9 @@ class DatabaseInventory:
         print("Collecting server information...")
         server_info = self.get_server_info()
         
+        print("Collecting server configurations...")
+        server_configs = self.get_server_configurations()
+        
         print("Collecting database metadata...")
         metadata = self.collect_database_metadata()
         
@@ -342,6 +453,7 @@ class DatabaseInventory:
         
         report = {
             'server_info': server_info,
+            'server_configurations': server_configs,
             'metadata': metadata,
             'performance': performance,
             'generated_at': datetime.now().isoformat()
@@ -386,6 +498,13 @@ class DatabaseInventory:
         print(f"Version: {server.get('version', 'Unknown')}")
         print(f"Edition: {server.get('edition', 'Unknown')}")
         
+        # Configuration Summary
+        configs = report.get('server_configurations', {})
+        if 'configurations' in configs:
+            print(f"\n  Server Configurations: {configs.get('count', 0)}")
+            if configs.get('pending_restart'):
+                print("     Warning: Some configuration changes require restart")
+        
         # Database Summary
         databases = report.get('metadata', {}).get('databases', [])
         print(f"\n Total Databases: {len(databases)}")
@@ -402,17 +521,32 @@ class DatabaseInventory:
         total_sps = sum(len(db.get('stored_procedures', [])) for db in databases)
         print(f"  Total Stored Procedures: {total_sps}")
         
+        total_high_frag = sum(
+            db.get('fragmentation', {}).get('summary', {}).get('high_fragmentation', 0) 
+            for db in databases
+        )
+        total_mod_frag = sum(
+            db.get('fragmentation', {}).get('summary', {}).get('moderate_fragmentation', 0) 
+            for db in databases
+        )
+        
+        if total_high_frag > 0 or total_mod_frag > 0:
+            print(f"\n🔧 Fragmentation Status:")
+            if total_high_frag > 0:
+                print(f"   High fragmentation (>30%): {total_high_frag} indexes")
+            if total_mod_frag > 0:
+                print(f"    Moderate fragmentation (>10%): {total_mod_frag} indexes")
+        
         # Performance Metrics
         perf = report.get('performance', {})
         cpu = perf.get('cpu', {})
         if 'sql_cpu_usage' in cpu:
-            print(f"\n  SQL CPU Usage: {cpu['sql_cpu_usage']}%")
+            print(f"\n SQL CPU Usage: {cpu['sql_cpu_usage']}%")
         
         memory = perf.get('memory', {})
         if 'memory_used_mb' in memory:
             print(f" Memory Used: {memory['memory_used_mb']:.2f} MB")
         
-        # Top 5 Largest Databases
         if databases:
             print("\n Top 5 Largest Databases:")
             sorted_dbs = sorted(databases, 
@@ -434,15 +568,15 @@ class DatabaseInventory:
 # Usage
 if __name__ == "__main__":
     print("\n" + "="*60)
-    print("SQL SERVER DATABASE INVENTORY COLLECTOR")
+    print("SQL SERVER DATABASE INVENTORY COLLECTOR (ENHANCED)")
     print("="*60 + "\n")
     
-    SQL_SERVER = os.getenv("SQL_SERVER", "localhost")
+    SQL_SERVER = os.getenv("SQL_SERVER", "127.0.0.1")
     SQL_DATABASE = os.getenv("SQL_DATABASE", "master")
     SQL_USERNAME = os.getenv("SQL_USERNAME", "sa")
     SQL_PASSWORD = os.getenv("SQL_PASSWORD", "")
     SQL_PORT = os.getenv("SQL_PORT", "1433")
-
+    
     conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={SQL_SERVER},{SQL_PORT};DATABASE={SQL_DATABASE};UID={SQL_USERNAME};PWD={SQL_PASSWORD}"
     
     try:
@@ -453,15 +587,16 @@ if __name__ == "__main__":
         output_file = 'outputs/sql_server_inventory.json'
         report = inventory.generate_inventory_report(output_file)
         
-        # Generate summary
         inventory.generate_summary(report, output_file)
         
         inventory.close()
         
         print("\n Next Steps:")
         print("1. Review outputs/sql_server_inventory.json")
-        print("2. Use GitHub Copilot to analyze: 'Analyze sql_server_inventory.json and suggest Aurora PostgreSQL instance sizing'")
-        print("3. Run migration readiness assessment (UC5)")
+        print("2. Check server_configurations section for all SQL Server settings")
+        print("3. Review fragmentation details for each database")
+        print("4. Use GitHub Copilot to analyze: 'Analyze sql_server_inventory.json and suggest Aurora PostgreSQL instance sizing'")
+        print("5. Run migration readiness assessment (UC5)")
         
     except pyodbc.Error as e:
         print(f"\n Database Error: {e}")
