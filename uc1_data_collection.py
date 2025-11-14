@@ -6,9 +6,6 @@ import pyodbc
 import json
 from datetime import datetime
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class DatabaseInventory:
     def __init__(self, connection_string):
@@ -20,13 +17,11 @@ class DatabaseInventory:
             print(" Created 'outputs' folder")
         
     def collect_database_metadata(self):
-        # Collect all database schemas, sizes, and configuration
         metadata = {
             'timestamp': datetime.now().isoformat(),
             'databases': []
         }
         
-        # Get all databases
         self.cursor.execute("""
             SELECT 
                 name, 
@@ -59,14 +54,13 @@ class DatabaseInventory:
                 'indexes': self.get_index_info(dbname),
                 'stored_procedures': self.get_stored_procedure_info(dbname),
                 'constraints': self.get_constraint_info(dbname),
-                'fragmentation': self.get_fragmentation_info(dbname)
+                'fragmentation': self.get_fragmentation_info(dbname)  # NEW
             }
             metadata['databases'].append(db_info)
             
         return metadata
     
     def get_schemas(self, database_name):
-        # Get all schemas in database
         try:
             self.cursor.execute(f"""
                 SELECT name 
@@ -243,10 +237,10 @@ class DatabaseInventory:
                     i.name AS IndexName,
                     i.type_desc AS IndexType,
                     ips.index_id,
-                    ips.avg_fragmentation_in_percent,
+                    ROUND(ips.avg_fragmentation_in_percent, 2) AS avg_fragmentation_in_percent,
                     ips.fragment_count,
                     ips.page_count,
-                    ips.avg_page_space_used_in_percent,
+                    ROUND(ips.avg_page_space_used_in_percent, 2) AS avg_page_space_used_in_percent,
                     ips.record_count
                 FROM sys.dm_db_index_physical_stats(
                     DB_ID('{database_name}'), 
@@ -268,9 +262,8 @@ class DatabaseInventory:
             moderate_frag_count = 0
             
             for row in self.cursor.fetchall():
-                frag_pct = row.avg_fragmentation_in_percent
+                frag_pct = float(row.avg_fragmentation_in_percent) if row.avg_fragmentation_in_percent else 0.0
                 
-                # Categorize fragmentation level
                 if frag_pct > 30:
                     frag_level = 'HIGH'
                     high_frag_count += 1
@@ -280,7 +273,6 @@ class DatabaseInventory:
                 else:
                     frag_level = 'LOW'
                 
-                # Determine recommendation
                 if frag_pct > 30:
                     recommendation = 'REBUILD index recommended'
                 elif frag_pct > 10:
@@ -293,11 +285,11 @@ class DatabaseInventory:
                     'table': row.TableName,
                     'index_name': row.IndexName,
                     'index_type': row.IndexType,
-                    'fragmentation_percent': round(frag_pct, 2),
+                    'fragmentation_percent': frag_pct,
                     'fragmentation_level': frag_level,
                     'fragment_count': row.fragment_count,
                     'page_count': row.page_count,
-                    'avg_page_space_used_percent': round(row.avg_page_space_used_in_percent, 2),
+                    'avg_page_space_used_percent': float(row.avg_page_space_used_in_percent) if row.avg_page_space_used_in_percent else 0.0,
                     'record_count': row.record_count,
                     'recommendation': recommendation
                 })
@@ -505,7 +497,6 @@ class DatabaseInventory:
             if configs.get('pending_restart'):
                 print("     Warning: Some configuration changes require restart")
         
-        # Database Summary
         databases = report.get('metadata', {}).get('databases', [])
         print(f"\n Total Databases: {len(databases)}")
         
@@ -531,17 +522,16 @@ class DatabaseInventory:
         )
         
         if total_high_frag > 0 or total_mod_frag > 0:
-            print(f"\n🔧 Fragmentation Status:")
+            print(f"\n Fragmentation Status:")
             if total_high_frag > 0:
-                print(f"   High fragmentation (>30%): {total_high_frag} indexes")
+                print(f"    High fragmentation (>30%): {total_high_frag} indexes")
             if total_mod_frag > 0:
                 print(f"    Moderate fragmentation (>10%): {total_mod_frag} indexes")
         
-        # Performance Metrics
         perf = report.get('performance', {})
         cpu = perf.get('cpu', {})
         if 'sql_cpu_usage' in cpu:
-            print(f"\n SQL CPU Usage: {cpu['sql_cpu_usage']}%")
+            print(f"\n  SQL CPU Usage: {cpu['sql_cpu_usage']}%")
         
         memory = perf.get('memory', {})
         if 'memory_used_mb' in memory:
@@ -565,7 +555,6 @@ class DatabaseInventory:
         self.cursor.close()
         self.conn.close()
 
-# Usage
 if __name__ == "__main__":
     print("\n" + "="*60)
     print("SQL SERVER DATABASE INVENTORY COLLECTOR (ENHANCED)")
@@ -574,7 +563,7 @@ if __name__ == "__main__":
     SQL_SERVER = os.getenv("SQL_SERVER", "127.0.0.1")
     SQL_DATABASE = os.getenv("SQL_DATABASE", "master")
     SQL_USERNAME = os.getenv("SQL_USERNAME", "sa")
-    SQL_PASSWORD = os.getenv("SQL_PASSWORD", "")
+    SQL_PASSWORD = os.getenv("SQL_PASSWORD", "Mysql_User123!")
     SQL_PORT = os.getenv("SQL_PORT", "1433")
     
     conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={SQL_SERVER},{SQL_PORT};DATABASE={SQL_DATABASE};UID={SQL_USERNAME};PWD={SQL_PASSWORD}"
