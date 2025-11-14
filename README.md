@@ -93,6 +93,11 @@ python scripts/collect_and_analyze.py
 # Or anything else in scripts/
 python scripts/<your-script>.py --help
 ```
+### The way of running use case specific scripts
+```bash
+#for use case 9
+python path\to\use_case_9_migration.py --database=YourSQLDB
+```
 
 ## Common Troubleshooting
 
