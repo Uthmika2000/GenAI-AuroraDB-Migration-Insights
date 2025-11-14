@@ -14,7 +14,6 @@ from pathlib import Path
 import pandas as pd
 
 class ApplicationCodeScanner:
-    # SQL Server specific patterns to detect
     PATTERNS = {
         'connection_strings': [
             r'Server\s*=',
@@ -61,7 +60,6 @@ class ApplicationCodeScanner:
         ]
     }
     
-    # File extensions to scan
     SUPPORTED_EXTENSIONS = {
         '.cs', '.vb', '.java', '.py', '.js', '.ts', 
         '.php', '.rb', '.go', '.sql', '.xml', '.config',
@@ -74,12 +72,10 @@ class ApplicationCodeScanner:
         self.scan_results = []
         
     def create_output_directory(self):
-        """Create directory for scan results"""
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
-        print(f"✓ Output directory created: {self.output_dir}/")
+        print(f" Output directory created: {self.output_dir}/")
     
     def scan_file(self, file_path: str) -> dict:
-        """Scan a single file for SQL Server dependencies"""
         findings = {
             'file_path': file_path,
             'file_name': os.path.basename(file_path),
@@ -101,7 +97,6 @@ class ApplicationCodeScanner:
                 for line in content.split('\n'):
                     line_number += 1
                     
-                    # Check connection strings
                     for pattern in self.PATTERNS['connection_strings']:
                         if re.search(pattern, line, re.IGNORECASE):
                             findings['issues'].append({
@@ -114,7 +109,6 @@ class ApplicationCodeScanner:
                             })
                             findings['connection_strings_found'] += 1
                     
-                    # Check T-SQL syntax
                     for pattern in self.PATTERNS['tsql_syntax']:
                         matches = re.finditer(pattern, line, re.IGNORECASE)
                         for match in matches:
@@ -129,7 +123,6 @@ class ApplicationCodeScanner:
                             })
                             findings['tsql_syntax_found'] += 1
                     
-                    # Check stored procedure calls
                     for pattern in self.PATTERNS['stored_procedures']:
                         matches = re.finditer(pattern, line, re.IGNORECASE)
                         for match in matches:
@@ -144,7 +137,6 @@ class ApplicationCodeScanner:
                             })
                             findings['stored_procedures_found'] += 1
                     
-                    # Check SQL Server specific data types
                     for pattern in self.PATTERNS['sql_server_types']:
                         matches = re.finditer(pattern, line, re.IGNORECASE)
                         for match in matches:
@@ -167,7 +159,6 @@ class ApplicationCodeScanner:
         return findings
     
     def get_postgresql_alternative(self, tsql_element: str) -> str:
-        """Get PostgreSQL alternative for T-SQL syntax"""
         alternatives = {
             'GETDATE()': 'Use CURRENT_TIMESTAMP or NOW()',
             'DATEADD': 'Use date/time arithmetic (e.g., timestamp + INTERVAL \'1 day\')',
@@ -193,7 +184,6 @@ class ApplicationCodeScanner:
         return 'Consult PostgreSQL documentation for equivalent syntax'
     
     def get_postgresql_type_mapping(self, sql_type: str) -> str:
-        """Get PostgreSQL type mapping"""
         type_map = {
             'UNIQUEIDENTIFIER': 'Use UUID type (requires uuid-ossp extension)',
             'DATETIME2': 'Use TIMESTAMP',
@@ -211,7 +201,6 @@ class ApplicationCodeScanner:
         return 'Review data type compatibility'
     
     def scan_directory(self, directory: str = None, recursive: bool = True) -> list:
-        """Scan directory for application files"""
         if directory is None:
             directory = self.scan_dir
         
@@ -224,7 +213,6 @@ class ApplicationCodeScanner:
         
         if recursive:
             for root, dirs, files in os.walk(directory):
-                # Skip common directories
                 dirs[:] = [d for d in dirs if d not in [
                     'node_modules', '.git', '.svn', 'bin', 'obj', 
                     '__pycache__', 'venv', '.venv', 'dist', 'build'
@@ -255,14 +243,13 @@ class ApplicationCodeScanner:
                             files_with_issues += 1
                         files_scanned += 1
         
-        print(f"\n✓ Scan complete!")
+        print(f"\n Scan complete!")
         print(f"  Files scanned: {files_scanned}")
         print(f"  Files with issues: {files_with_issues}")
         
         return self.scan_results
     
     def generate_summary_report(self) -> dict:
-        """Generate summary report of scan results"""
         if not self.scan_results:
             return {
                 'status': 'NO_ISSUES',
@@ -291,19 +278,16 @@ class ApplicationCodeScanner:
             'top_files_with_issues': []
         }
         
-        # Count by extension
         for result in self.scan_results:
             ext = result['file_extension']
             if ext not in summary['files_by_extension']:
                 summary['files_by_extension'][ext] = 0
             summary['files_by_extension'][ext] += 1
             
-            # Count by severity and category
             for issue in result['issues']:
                 summary['severity_breakdown'][issue['severity']] += 1
                 summary['category_breakdown'][issue['category']] += 1
         
-        # Top files with most issues
         sorted_results = sorted(self.scan_results, key=lambda x: x['total_issues'], reverse=True)
         summary['top_files_with_issues'] = [
             {
@@ -320,14 +304,12 @@ class ApplicationCodeScanner:
         return summary
     
     def generate_remediation_plan(self, summary: dict) -> dict:
-        """Generate remediation plan based on scan results"""
         plan = {
             'priority_levels': [],
             'estimated_effort': {},
             'recommendations': []
         }
         
-        # Priority 1: Connection Strings (Critical for cutover)
         if summary['statistics']['connection_strings'] > 0:
             plan['priority_levels'].append({
                 'priority': 1,
@@ -343,7 +325,6 @@ class ApplicationCodeScanner:
                 ]
             })
         
-        # Priority 2: Stored Procedure Calls
         if summary['statistics']['stored_procedures'] > 0:
             plan['priority_levels'].append({
                 'priority': 2,
@@ -359,7 +340,6 @@ class ApplicationCodeScanner:
                 ]
             })
         
-        # Priority 3: T-SQL Syntax
         if summary['statistics']['tsql_syntax'] > 0:
             plan['priority_levels'].append({
                 'priority': 3,
@@ -375,7 +355,6 @@ class ApplicationCodeScanner:
                 ]
             })
         
-        # Priority 4: Data Types
         if summary['statistics']['sql_server_types'] > 0:
             plan['priority_levels'].append({
                 'priority': 4,
@@ -391,17 +370,15 @@ class ApplicationCodeScanner:
                 ]
             })
         
-        # Effort estimation
         total_issues = summary['statistics']['total_issues']
         plan['estimated_effort'] = {
             'total_issues': total_issues,
-            'estimated_hours': total_issues * 0.5,  # 30 minutes per issue average
+            'estimated_hours': total_issues * 0.5,
             'estimated_days': round((total_issues * 0.5) / 8, 1),
             'recommended_team_size': '2-3 developers',
             'estimated_calendar_weeks': round((total_issues * 0.5) / (8 * 2), 1)
         }
         
-        # General recommendations
         plan['recommendations'] = [
             'Create a dedicated branch for PostgreSQL compatibility changes',
             'Update one file at a time and test thoroughly',
@@ -415,7 +392,6 @@ class ApplicationCodeScanner:
         return plan
     
     def export_detailed_report(self, output_file: str = 'code_scan_detailed.json'):
-        """Export detailed scan results"""
         report = {
             'metadata': {
                 'scan_date': datetime.now().isoformat(),
@@ -429,15 +405,13 @@ class ApplicationCodeScanner:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, indent=2, default=str)
         
-        print(f"✓ Detailed report saved: {output_path}")
+        print(f" Detailed report saved: {output_path}")
     
     def export_excel_report(self, output_file: str = 'code_scan_report.xlsx'):
-        """Export scan results to Excel for easy review"""
         if not self.scan_results:
-            print("⚠ No scan results to export")
+            print(" No scan results to export")
             return
         
-        # Flatten issues for Excel
         issues_data = []
         for result in self.scan_results:
             for issue in result['issues']:
@@ -458,7 +432,6 @@ class ApplicationCodeScanner:
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Issues', index=False)
             
-            # Summary sheet
             summary_data = {
                 'Metric': ['Total Files', 'Total Issues', 'Connection Strings', 
                           'T-SQL Syntax', 'Stored Procedures', 'Data Types'],
@@ -473,40 +446,33 @@ class ApplicationCodeScanner:
             }
             pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
         
-        print(f"✓ Excel report saved: {output_path}")
+        print(f" Excel report saved: {output_path}")
     
     def generate_all_reports(self):
-        """Generate all reports and analysis"""
-        print(f"\n📊 Generating comprehensive code scan reports...")
-        
-        # Create output directory
+        print(f"\n Generating comprehensive code scan reports...")
+
         self.create_output_directory()
-        
-        # Generate summary
+
         print("\n  • Generating summary report...")
         summary = self.generate_summary_report()
         summary_path = os.path.join(self.output_dir, 'scan_summary.json')
         with open(summary_path, 'w', encoding='utf-8') as f:
             json.dump(summary, f, indent=2, default=str)
         
-        # Generate remediation plan
         print("  • Generating remediation plan...")
         remediation = self.generate_remediation_plan(summary)
         remediation_path = os.path.join(self.output_dir, 'remediation_plan.json')
         with open(remediation_path, 'w', encoding='utf-8') as f:
             json.dump(remediation, f, indent=2, default=str)
         
-        # Export detailed results
         print("  • Exporting detailed results...")
         self.export_detailed_report()
         
-        # Export Excel report
         print("  • Creating Excel report...")
         self.export_excel_report()
         
-        print("\n✓ All reports generated successfully!")
+        print("\n All reports generated successfully!")
         
-        # Print summary
         print("\n" + "="*70)
         print("APPLICATION CODE SCAN SUMMARY")
         print("="*70)
@@ -533,9 +499,8 @@ class ApplicationCodeScanner:
         
         return summary, remediation
 
-# Usage Example
 if __name__ == "__main__":
-    # Parse command line arguments
+
     parser = argparse.ArgumentParser(description='Application Code Scanner for SQL Server to PostgreSQL Migration')
     parser.add_argument('--directory', type=str, help='Application directory path to scan')
     parser.add_argument('--recursive', action='store_true', default=True, help='Scan directories recursively (default: True)')
@@ -544,11 +509,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # Get application directory
     if args.directory:
         application_directory = args.directory
     else:
-        # Interactive mode if no directory specified
         print("\n" + "="*70)
         print("APPLICATION CODE SCANNER")
         print("="*70)
@@ -561,14 +524,13 @@ if __name__ == "__main__":
             application_directory = "."
             print(f"Using current directory: {os.path.abspath(application_directory)}")
     
-    # Validate directory exists
     if not os.path.exists(application_directory):
-        print(f"\n✗ Error: Directory not found: {application_directory}")
+        print(f"\n Error: Directory not found: {application_directory}")
         print("\nPlease provide a valid directory path.")
         sys.exit(1)
     
     if not os.path.isdir(application_directory):
-        print(f"\n✗ Error: Path is not a directory: {application_directory}")
+        print(f"\n Error: Path is not a directory: {application_directory}")
         sys.exit(1)
     
     print("\n" + "="*70)
@@ -580,7 +542,6 @@ if __name__ == "__main__":
     
     scanner = ApplicationCodeScanner(application_directory)
     
-    # Custom file extensions if specified
     if args.extensions:
         custom_extensions = {ext.strip() if ext.startswith('.') else f'.{ext.strip()}' 
                            for ext in args.extensions.split(',')}
@@ -591,22 +552,21 @@ if __name__ == "__main__":
         # Perform scan
         results = scanner.scan_directory(recursive=args.recursive)
         
-        # Generate all reports
         if results:
             summary, remediation = scanner.generate_all_reports()
-            print("\n✓ Code scan completed successfully!")
+            print("\n Code scan completed successfully!")
             print(f"\nView results:")
             print(f"  • Excel Report: {scanner.output_dir}/code_scan_report.xlsx")
             print(f"  • JSON Reports: {scanner.output_dir}/")
         else:
-            print("\n✓ No SQL Server dependencies found in scanned files!")
+            print("\n No SQL Server dependencies found in scanned files!")
             print("This is good news - no application code changes needed!")
     
     except KeyboardInterrupt:
-        print("\n\n✗ Scan interrupted by user")
+        print("\n\n Scan interrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n✗ Error during scan: {e}")
+        print(f"\n Error during scan: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
